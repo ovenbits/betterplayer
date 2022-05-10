@@ -68,6 +68,18 @@ import java.lang.IllegalStateException
 import java.util.*
 import kotlin.math.max
 import kotlin.math.min
+import java.io.InputStream
+
+import android.os.AsyncTask
+import com.google.android.exoplayer2.ext.mediasession.TimelineQueueNavigator
+import java.net.URL
+import android.support.v4.media.MediaDescriptionCompat
+
+import com.google.android.exoplayer2.Player
+
+
+
+
 
 internal class BetterPlayer(
     context: Context,
@@ -89,6 +101,9 @@ internal class BetterPlayer(
     private var exoPlayerEventListener: Player.Listener? = null
     private var bitmap: Bitmap? = null
     private var mediaSession: MediaSessionCompat? = null
+    private var mediaSessionConnector: MediaSessionConnector? = null
+    private var mediaMetadata: MediaMetadataCompat? = null
+    private var mediaSource: MediaSource? = null
     private var drmSessionManager: DrmSessionManager? = null
     private val workManager: WorkManager
     private val workerObserverMap: HashMap<UUID, Observer<WorkInfo?>>
@@ -108,6 +123,8 @@ internal class BetterPlayer(
         exoPlayer = ExoPlayer.Builder(context)
             .setTrackSelector(trackSelector)
             .setLoadControl(loadControl)
+            .setSeekBackIncrementMs(10000)
+            .setSeekForwardIncrementMs(10000)
             .build()
         workManager = WorkManager.getInstance(context)
         workerObserverMap = HashMap()
@@ -193,25 +210,31 @@ internal class BetterPlayer(
         } else {
             dataSourceFactory = DefaultDataSource.Factory(context)
         }
-        val mediaSource = buildMediaSource(uri, dataSourceFactory, formatHint, cacheKey, context)
+        mediaSource = buildMediaSource(uri, dataSourceFactory, formatHint, cacheKey, context)
         if (overriddenDuration != 0L) {
-            val clippingMediaSource = ClippingMediaSource(mediaSource, 0, overriddenDuration * 1000)
+            val clippingMediaSource = ClippingMediaSource(mediaSource!!, 0, overriddenDuration * 1000)
             exoPlayer?.setMediaSource(clippingMediaSource)
         } else {
-            exoPlayer?.setMediaSource(mediaSource)
+            exoPlayer?.setMediaSource(mediaSource!!)
         }
         exoPlayer?.prepare()
         result.success(null)
     }
 
     fun setupPlayerNotification(
-        context: Context, title: String, author: String?,
-        imageUrl: String?, notificationChannelName: String?,
-        activityName: String
+        context: Context, id: String, album: String, title: String, artist: String?,
+        genre: String?, duration: Long, imageUrl: String?,
+        displayTitle: String?, displaySubtitle: String?, displayDescription: String?,
+        notificationChannelName: String?, activityName: String
     ) {
+        mediaMetadata = createMediaMetadata(
+                id, album, title, artist, genre, duration,
+                imageUrl, displayTitle, displaySubtitle, displayDescription
+        );
+
         val mediaDescriptionAdapter: MediaDescriptionAdapter = object : MediaDescriptionAdapter {
             override fun getCurrentContentTitle(player: Player): String {
-                return title
+                return title;
             }
 
             @SuppressLint("UnspecifiedImmutableFlag")
@@ -232,7 +255,7 @@ internal class BetterPlayer(
             }
 
             override fun getCurrentContentText(player: Player): String? {
-                return author
+                return artist
             }
 
             override fun getCurrentLargeIcon(
@@ -314,14 +337,16 @@ internal class BetterPlayer(
         playerNotificationManager?.apply {
 
             exoPlayer?.let {
-                setPlayer(ForwardingPlayer(exoPlayer))
+                setPlayer(if (mediaMetadata == null) null else ForwardingPlayer(exoPlayer))
                 setUseNextAction(false)
                 setUsePreviousAction(false)
-                setUseStopAction(false)
+                setUseStopAction(true)
             }
 
             setupMediaSession(context)?.let {
-                setMediaSessionToken(it.sessionToken)
+                if (mediaMetadata != null) {
+                    setMediaSessionToken(it.sessionToken)
+                }
             }
         }
 
@@ -357,6 +382,8 @@ internal class BetterPlayer(
             exoPlayer?.addListener(exoPlayerEventListener)
         }
         exoPlayer?.seekTo(0)
+
+        mediaSessionConnector?.invalidateMediaSessionMetadata()
     }
 
     fun disposeRemoteNotifications() {
@@ -520,6 +547,13 @@ internal class BetterPlayer(
     }
 
     fun play() {
+        mediaSession?.isActive = true;
+
+        if (exoPlayer?.playbackState == Player.STATE_IDLE && mediaSource != null) {
+            // the player was likely stopped from the notification, so we need to re-prepare it before it'll plays
+            exoPlayer?.setMediaSource(mediaSource!!);
+        }
+
         exoPlayer?.playWhenReady = true
     }
 
@@ -629,8 +663,8 @@ internal class BetterPlayer(
                 }
             })
             mediaSession.isActive = true
-            val mediaSessionConnector = MediaSessionConnector(mediaSession)
-            mediaSessionConnector.setPlayer(exoPlayer)
+            mediaSessionConnector = MediaSessionConnector(mediaSession)
+            mediaSessionConnector?.setPlayer(exoPlayer)
             this.mediaSession = mediaSession
             return mediaSession
         }
@@ -646,6 +680,7 @@ internal class BetterPlayer(
 
     fun disposeMediaSession() {
         if (mediaSession != null) {
+            mediaSession?.isActive = false
             mediaSession?.release()
         }
         mediaSession = null
@@ -757,6 +792,23 @@ internal class BetterPlayer(
         var result = exoPlayer?.hashCode() ?: 0
         result = 31 * result + if (surface != null) surface.hashCode() else 0
         return result
+    }
+
+    private fun createMediaMetadata(mediaId: String, album: String, title: String, artist: String?, genre: String?, duration: Long?, artUri: String?, displayTitle: String?, displaySubtitle: String?, displayDescription: String?): MediaMetadataCompat? {
+        val builder = MediaMetadataCompat.Builder()
+                .putString(MediaMetadataCompat.METADATA_KEY_MEDIA_ID, mediaId)
+                .putString(MediaMetadataCompat.METADATA_KEY_ALBUM, album)
+                .putString(MediaMetadataCompat.METADATA_KEY_TITLE, title)
+        if (artist != null) builder.putString(MediaMetadataCompat.METADATA_KEY_ARTIST, artist)
+        if (genre != null) builder.putString(MediaMetadataCompat.METADATA_KEY_GENRE, genre)
+        if (duration != null) builder.putLong(MediaMetadataCompat.METADATA_KEY_DURATION, duration)
+        if (artUri != null) {
+            builder.putString(MediaMetadataCompat.METADATA_KEY_DISPLAY_ICON_URI, artUri)
+        }
+        if (displayTitle != null) builder.putString(MediaMetadataCompat.METADATA_KEY_DISPLAY_TITLE, title)
+        if (displaySubtitle != null) builder.putString(MediaMetadataCompat.METADATA_KEY_DISPLAY_SUBTITLE, displaySubtitle)
+        if (displayDescription != null) builder.putString(MediaMetadataCompat.METADATA_KEY_DISPLAY_DESCRIPTION, displayDescription)
+        return builder.build()
     }
 
     companion object {

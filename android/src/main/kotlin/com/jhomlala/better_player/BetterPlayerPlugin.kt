@@ -23,6 +23,7 @@ import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.EventChannel
 import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding
 import io.flutter.plugin.common.BinaryMessenger
+import io.flutter.plugin.common.PluginRegistry
 import io.flutter.view.TextureRegistry
 import java.lang.Exception
 import java.util.HashMap
@@ -30,15 +31,17 @@ import java.util.HashMap
 /**
  * Android platform implementation of the VideoPlayerPlugin.
  */
-class BetterPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
+class BetterPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler, PluginRegistry.UserLeaveHintListener {
     private val videoPlayers = LongSparseArray<BetterPlayer>()
     private val dataSources = LongSparseArray<Map<String, Any?>>()
     private var flutterState: FlutterState? = null
     private var currentNotificationTextureId: Long = -1
     private var currentNotificationDataSource: Map<String, Any?>? = null
     private var activity: Activity? = null
+    private var activityPluginBinding: ActivityPluginBinding? = null
     private var pipHandler: Handler? = null
     private var pipRunnable: Runnable? = null
+    private var callActivityEnterPictureInPictureModeOnUserLeaveHintForPlayer: BetterPlayer? = null
     override fun onAttachedToEngine(binding: FlutterPluginBinding) {
         val loader = FlutterLoader()
         flutterState = FlutterState(
@@ -74,14 +77,30 @@ class BetterPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
     }
 
     override fun onAttachedToActivity(binding: ActivityPluginBinding) {
+        binding.addOnUserLeaveHintListener(this)
+        activityPluginBinding = binding
         activity = binding.activity
     }
 
-    override fun onDetachedFromActivityForConfigChanges() {}
+    override fun onDetachedFromActivityForConfigChanges() {
+        activityPluginBinding?.removeOnUserLeaveHintListener(this)
+    }
 
-    override fun onReattachedToActivityForConfigChanges(binding: ActivityPluginBinding) {}
+    override fun onReattachedToActivityForConfigChanges(binding: ActivityPluginBinding) {
+        binding.addOnUserLeaveHintListener(this)
+        activityPluginBinding = binding
+        activity = binding.activity
+    }
 
-    override fun onDetachedFromActivity() {}
+    override fun onDetachedFromActivity() {
+        activityPluginBinding?.removeOnUserLeaveHintListener(this)
+    }
+
+    override fun onUserLeaveHint() {
+        if (isPictureInPictureSupported() && callActivityEnterPictureInPictureModeOnUserLeaveHintForPlayer != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            enablePictureInPicture(callActivityEnterPictureInPictureModeOnUserLeaveHintForPlayer!!);
+        }
+    }
 
     private fun disposeAllPlayers() {
         for (i in 0 until videoPlayers.size()) {
@@ -124,6 +143,12 @@ class BetterPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
             PRE_CACHE_METHOD -> preCache(call, result)
             STOP_PRE_CACHE_METHOD -> stopPreCache(call, result)
             CLEAR_CACHE_METHOD -> clearCache(result)
+            SET_CALL_ACTIVITY_ENTER_PICTURE_IN_PICTURE_MODE_ON_USER_LEAVE_HINT_METHOD -> {
+                val textureId = (call.argument<Any>(TEXTURE_ID_PARAMETER) as Number?)!!.toLong()
+                val player = videoPlayers[textureId]
+                setCallActivityEnterPictureInPictureModeOnUserLeaveHint(player, call.argument<Boolean>(SHOULD_CALL_PARAMETER) ?: false);
+                result.success(null);
+            }
             else -> {
                 val textureId = (call.argument<Any>(TEXTURE_ID_PARAMETER) as Number?)!!.toLong()
                 val player = videoPlayers[textureId]
@@ -366,16 +391,24 @@ class BetterPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
                 removeOtherNotificationListeners()
                 val showNotification = getParameter(dataSource, SHOW_NOTIFICATION_PARAMETER, false)
                 if (showNotification) {
+                    val id = getParameter(dataSource, ID_PARAMETER, "")
+                    val album = getParameter(dataSource, ALBUM_PARAMETER, "")
                     val title = getParameter(dataSource, TITLE_PARAMETER, "")
-                    val author = getParameter(dataSource, AUTHOR_PARAMETER, "")
+                    val artist = getParameter(dataSource, ARTIST_PARAMETER, "")
+                    val genre = getParameter(dataSource, GENRE_PARAMETER, "")
+                    val duration = getParameter<Long>(dataSource, DURATION_PARAMETER, 0)
                     val imageUrl = getParameter(dataSource, IMAGE_URL_PARAMETER, "")
+                    val displayTitle = getParameter(dataSource, DISPLAY_TITLE_PARAMETER, "")
+                    val displaySubtitle = getParameter(dataSource, DISPLAY_SUBTITLE_PARAMETER, "")
+                    val displayDescription = getParameter(dataSource, DISPLAY_DESCRIPTION_PARAMETER, "")
                     val notificationChannelName =
                         getParameter<String?>(dataSource, NOTIFICATION_CHANNEL_NAME_PARAMETER, null)
                     val activityName =
                         getParameter(dataSource, ACTIVITY_NAME_PARAMETER, "MainActivity")
                     betterPlayer.setupPlayerNotification(
                         flutterState?.applicationContext!!,
-                        title, author, imageUrl, notificationChannelName, activityName
+                            id, album, title, artist, genre, duration, imageUrl,
+                            displayTitle, displaySubtitle, displayDescription, notificationChannelName, activityName
                     )
                 }
             }
@@ -409,8 +442,11 @@ class BetterPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
     private fun enablePictureInPicture(player: BetterPlayer) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             player.setupMediaSession(flutterState!!.applicationContext)
-            activity!!.enterPictureInPictureMode(PictureInPictureParams.Builder().build())
-            startPictureInPictureListenerTimer(player)
+            if (!activity!!.isInPictureInPictureMode) {
+                activity!!.enterPictureInPictureMode(PictureInPictureParams.Builder().build())
+                startPictureInPictureListenerTimer(player)
+            }
+
             player.onPictureInPictureStatusChanged(true)
         }
     }
@@ -423,19 +459,21 @@ class BetterPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
     }
 
     private fun startPictureInPictureListenerTimer(player: BetterPlayer) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-            pipHandler = Handler(Looper.getMainLooper())
-            pipRunnable = Runnable {
-                if (activity!!.isInPictureInPictureMode) {
-                    pipHandler!!.postDelayed(pipRunnable!!, 100)
-                } else {
-                    player.onPictureInPictureStatusChanged(false)
-                    player.disposeMediaSession()
-                    stopPipHandler()
-                }
+        pipHandler = Handler(Looper.getMainLooper())
+        pipRunnable = Runnable {
+            if (activity!!.isInPictureInPictureMode) {
+                pipHandler!!.postDelayed(pipRunnable!!, 100)
+            } else {
+                player.onPictureInPictureStatusChanged(false)
+                player.disposeMediaSession()
+                stopPipHandler()
             }
-            pipHandler!!.post(pipRunnable!!)
         }
+        pipHandler!!.post(pipRunnable!!)
+    }
+
+    private fun setCallActivityEnterPictureInPictureModeOnUserLeaveHint(player: BetterPlayer, shouldCall: Boolean) {
+        callActivityEnterPictureInPictureModeOnUserLeaveHintForPlayer = if (shouldCall) player else null
     }
 
     private fun dispose(player: BetterPlayer, textureId: Long) {
@@ -501,9 +539,16 @@ class BetterPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
         private const val HEIGHT_PARAMETER = "height"
         private const val BITRATE_PARAMETER = "bitrate"
         private const val SHOW_NOTIFICATION_PARAMETER = "showNotification"
+        private const val ID_PARAMETER = "id"
+        private const val ALBUM_PARAMETER = "album"
         private const val TITLE_PARAMETER = "title"
-        private const val AUTHOR_PARAMETER = "author"
+        private const val ARTIST_PARAMETER = "artist"
+        private const val GENRE_PARAMETER = "genre"
+        private const val DURATION_PARAMETER = "duration"
         private const val IMAGE_URL_PARAMETER = "imageUrl"
+        private const val DISPLAY_TITLE_PARAMETER = "displayTitle"
+        private const val DISPLAY_SUBTITLE_PARAMETER = "displaySubtitle"
+        private const val DISPLAY_DESCRIPTION_PARAMETER = "displayDescription"
         private const val NOTIFICATION_CHANNEL_NAME_PARAMETER = "notificationChannelName"
         private const val OVERRIDDEN_DURATION_PARAMETER = "overriddenDuration"
         private const val NAME_PARAMETER = "name"
@@ -524,6 +569,7 @@ class BetterPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
         const val BUFFER_FOR_PLAYBACK_MS = "bufferForPlaybackMs"
         const val BUFFER_FOR_PLAYBACK_AFTER_REBUFFER_MS = "bufferForPlaybackAfterRebufferMs"
         const val CACHE_KEY_PARAMETER = "cacheKey"
+        const val SHOULD_CALL_PARAMETER = "shouldCall"
         private const val INIT_METHOD = "init"
         private const val CREATE_METHOD = "create"
         private const val SET_DATA_SOURCE_METHOD = "setDataSource"
@@ -545,5 +591,6 @@ class BetterPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
         private const val DISPOSE_METHOD = "dispose"
         private const val PRE_CACHE_METHOD = "preCache"
         private const val STOP_PRE_CACHE_METHOD = "stopPreCache"
+        private const val SET_CALL_ACTIVITY_ENTER_PICTURE_IN_PICTURE_MODE_ON_USER_LEAVE_HINT_METHOD = "setCallActivityEnterPictureInPictureModeOnUserLeaveHint"
     }
 }
