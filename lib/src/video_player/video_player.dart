@@ -40,8 +40,7 @@ class VideoPlayerValue {
 
   /// Returns an instance with a `null` [Duration] and the given
   /// [errorDescription].
-  VideoPlayerValue.erroneous(String errorDescription)
-      : this(duration: null, errorDescription: errorDescription);
+  VideoPlayerValue.erroneous(String errorDescription) : this(duration: null, errorDescription: errorDescription);
 
   /// The total duration of the video.
   ///
@@ -179,8 +178,7 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
     }
   }
 
-  final StreamController<VideoEvent> videoEventStreamController =
-      StreamController.broadcast();
+  final StreamController<VideoEvent> videoEventStreamController = StreamController.broadcast();
   final Completer<void> _creatingCompleter = Completer<void>();
   int? _textureId;
 
@@ -270,9 +268,7 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
       }
     }
 
-    _eventSubscription = _videoPlayerPlatform
-        .videoEventsFor(_textureId)
-        .listen(eventListener, onError: errorListener);
+    _eventSubscription = _videoPlayerPlatform.videoEventsFor(_textureId).listen(eventListener, onError: errorListener);
   }
 
   /// Set data source for playing a video from an asset.
@@ -284,9 +280,16 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
     String dataSource, {
     String? package,
     bool? showNotification,
+    String? id,
+    String? album,
     String? title,
-    String? author,
+    String? artist,
+    String? genre,
+    Duration? duration,
     String? imageUrl,
+    String? displayTitle,
+    String? displaySubtitle,
+    String? displayDescription,
     String? notificationChannelName,
     Duration? overriddenDuration,
     String? activityName,
@@ -297,9 +300,16 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
         asset: dataSource,
         package: package,
         showNotification: showNotification,
+        id: id,
+        album: album,
         title: title,
-        author: author,
+        artist: artist,
+        genre: genre,
+        duration: duration,
         imageUrl: imageUrl,
+        displayTitle: displayTitle,
+        displaySubtitle: displaySubtitle,
+        displayDescription: displayDescription,
         notificationChannelName: notificationChannelName,
         overriddenDuration: overriddenDuration,
         activityName: activityName,
@@ -324,9 +334,16 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
     int? maxCacheFileSize,
     String? cacheKey,
     bool? showNotification,
+    String? id,
+    String? album,
     String? title,
-    String? author,
+    String? artist,
+    String? genre,
+    Duration? duration,
     String? imageUrl,
+    String? displayTitle,
+    String? displaySubtitle,
+    String? displayDescription,
     String? notificationChannelName,
     Duration? overriddenDuration,
     String? licenseUrl,
@@ -347,9 +364,16 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
         maxCacheFileSize: maxCacheFileSize,
         cacheKey: cacheKey,
         showNotification: showNotification,
+        id: id,
+        album: album,
         title: title,
-        author: author,
+        artist: artist,
+        genre: genre,
+        duration: duration,
         imageUrl: imageUrl,
+        displayTitle: displayTitle,
+        displaySubtitle: displaySubtitle,
+        displayDescription: displayDescription,
         notificationChannelName: notificationChannelName,
         overriddenDuration: overriddenDuration,
         licenseUrl: licenseUrl,
@@ -366,27 +390,44 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
   ///
   /// This will load the file from the file-URI given by:
   /// `'file://${file.path}'`.
-  Future<void> setFileDataSource(File file,
-      {bool? showNotification,
-      String? title,
-      String? author,
-      String? imageUrl,
-      String? notificationChannelName,
-      Duration? overriddenDuration,
-      String? activityName,
-      String? clearKey}) {
+  Future<void> setFileDataSource(
+    File file, {
+    bool? showNotification,
+    String? id,
+    String? album,
+    String? title,
+    String? artist,
+    String? genre,
+    Duration? duration,
+    String? imageUrl,
+    String? displayTitle,
+    String? displaySubtitle,
+    String? displayDescription,
+    String? notificationChannelName,
+    Duration? overriddenDuration,
+    String? activityName,
+    String? clearKey,
+  }) {
     return _setDataSource(
       DataSource(
-          sourceType: DataSourceType.file,
-          uri: 'file://${file.path}',
-          showNotification: showNotification,
-          title: title,
-          author: author,
-          imageUrl: imageUrl,
-          notificationChannelName: notificationChannelName,
-          overriddenDuration: overriddenDuration,
-          activityName: activityName,
-          clearKey: clearKey),
+        sourceType: DataSourceType.file,
+        uri: 'file://${file.path}',
+        showNotification: showNotification,
+        id: id,
+        album: album,
+        title: title,
+        artist: artist,
+        genre: genre,
+        duration: duration,
+        imageUrl: imageUrl,
+        displayTitle: displayTitle,
+        displaySubtitle: displaySubtitle,
+        displayDescription: displayDescription,
+        notificationChannelName: notificationChannelName,
+        overriddenDuration: overriddenDuration,
+        activityName: activityName,
+        clearKey: clearKey,
+      ),
     );
   }
 
@@ -405,8 +446,7 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
 
     _initializingCompleter = Completer<void>();
 
-    await VideoPlayerPlatform.instance
-        .setDataSource(_textureId, dataSourceDescription);
+    await VideoPlayerPlatform.instance.setDataSource(_textureId, dataSourceDescription);
     return _initializingCompleter.future;
   }
 
@@ -476,8 +516,7 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
           }
           _updatePosition(newPosition, absolutePosition: newAbsolutePosition);
           if (_seekPosition != null && newPosition != null) {
-            final difference =
-                newPosition.inMilliseconds - _seekPosition!.inMilliseconds;
+            final difference = newPosition.inMilliseconds - _seekPosition!.inMilliseconds;
             if (difference > 0) {
               _seekPosition = null;
             }
@@ -585,14 +624,11 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
   /// [height] specifies height of the selected track
   /// [bitrate] specifies bitrate of the selected track
   Future<void> setTrackParameters(int? width, int? height, int? bitrate) async {
-    await _videoPlayerPlatform.setTrackParameters(
-        _textureId, width, height, bitrate);
+    await _videoPlayerPlatform.setTrackParameters(_textureId, width, height, bitrate);
   }
 
-  Future<void> enablePictureInPicture(
-      {double? top, double? left, double? width, double? height}) async {
-    await _videoPlayerPlatform.enablePictureInPicture(
-        textureId, top, left, width, height);
+  Future<void> enablePictureInPicture({double? top, double? left, double? width, double? height}) async {
+    await _videoPlayerPlatform.enablePictureInPicture(textureId, top, left, width, height);
   }
 
   Future<void> disablePictureInPicture() async {
@@ -611,6 +647,10 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
       return false;
     }
     return _videoPlayerPlatform.isPictureInPictureEnabled(_textureId);
+  }
+
+  Future<void> setCallActivityEnterPictureInPictureModeOnUserLeaveHint(bool shouldCall) async {
+    return _videoPlayerPlatform.setCallActivityEnterPictureInPictureModeOnUserLeaveHint(_textureId, shouldCall, value.size?.width.toInt() ?? 0, value.size?.height.toInt() ?? 0);
   }
 
   void refresh() {
@@ -691,9 +731,7 @@ class _VideoPlayerState extends State<VideoPlayer> {
 
   @override
   Widget build(BuildContext context) {
-    return _textureId == null
-        ? Container()
-        : _videoPlayerPlatform.buildView(_textureId);
+    return _textureId == null ? Container() : _videoPlayerPlatform.buildView(_textureId);
   }
 }
 

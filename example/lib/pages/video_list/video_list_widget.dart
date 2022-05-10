@@ -47,19 +47,19 @@ class _VideoListWidgetState extends State<VideoListWidget> {
                 BetterPlayerDataSource(
                   BetterPlayerDataSourceType.network,
                   videoListData!.videoUrl,
-                  notificationConfiguration:
-                      BetterPlayerNotificationConfiguration(
-                          showNotification: false,
-                          title: videoListData!.videoTitle,
-                          author: "Test"),
+                  notificationConfiguration: BetterPlayerNotificationConfiguration(
+                    showNotification: false,
+                    title: videoListData!.videoTitle,
+                    artist: "Test",
+                  ),
                   bufferingConfiguration: BetterPlayerBufferingConfiguration(
-                      minBufferMs: 2000,
-                      maxBufferMs: 10000,
-                      bufferForPlaybackMs: 1000,
-                      bufferForPlaybackAfterRebufferMs: 2000),
+                    minBufferMs: 2000,
+                    maxBufferMs: 10000,
+                    bufferForPlaybackMs: 1000,
+                    bufferForPlaybackAfterRebufferMs: 2000,
+                  ),
                 ),
-                configuration: BetterPlayerConfiguration(
-                    autoPlay: false, aspectRatio: 1, handleLifecycle: true),
+                configuration: BetterPlayerConfiguration(autoPlay: false, aspectRatio: 1, handleLifecycle: true),
                 //key: Key(videoListData.hashCode.toString()),
                 playFraction: 0.8,
                 betterPlayerListVideoPlayerController: controller,
@@ -67,8 +67,7 @@ class _VideoListWidgetState extends State<VideoListWidget> {
               aspectRatio: 1),
           Padding(
             padding: EdgeInsets.all(8),
-            child: Text(
-                "Horror: In Steven Spielberg's Jaws, a shark terrorizes a beach "
+            child: Text("Horror: In Steven Spielberg's Jaws, a shark terrorizes a beach "
                 "town. Plainspoken sheriff Roy Scheider, hippie shark "
                 "researcher Richard Dreyfuss, and a squirrely boat captain "
                 "set out to find the beast, but will they escape with their "

@@ -40,14 +40,11 @@ class MethodChannelVideoPlayer extends VideoPlayerPlatform {
           'minBufferMs': bufferingConfiguration.minBufferMs,
           'maxBufferMs': bufferingConfiguration.maxBufferMs,
           'bufferForPlaybackMs': bufferingConfiguration.bufferForPlaybackMs,
-          'bufferForPlaybackAfterRebufferMs':
-              bufferingConfiguration.bufferForPlaybackAfterRebufferMs,
+          'bufferForPlaybackAfterRebufferMs': bufferingConfiguration.bufferForPlaybackAfterRebufferMs,
         },
       );
 
-      response = responseLinkedHashMap != null
-          ? Map<String, dynamic>.from(responseLinkedHashMap)
-          : null;
+      response = responseLinkedHashMap != null ? Map<String, dynamic>.from(responseLinkedHashMap) : null;
     }
     return response?['textureId'] as int?;
   }
@@ -65,12 +62,19 @@ class MethodChannelVideoPlayer extends VideoPlayerPlatform {
           'maxCacheSize': 0,
           'maxCacheFileSize': 0,
           'showNotification': dataSource.showNotification,
+          'id': dataSource.id,
+          'album': dataSource.album,
           'title': dataSource.title,
-          'author': dataSource.author,
+          'artist': dataSource.artist,
+          'genre': dataSource.genre,
+          'duration': dataSource.duration,
           'imageUrl': dataSource.imageUrl,
+          'displayTitle': dataSource.displayTitle,
+          'displaySubtitle': dataSource.displaySubtitle,
+          'displayDescription': dataSource.displayDescription,
           'notificationChannelName': dataSource.notificationChannelName,
           'overriddenDuration': dataSource.overriddenDuration?.inMilliseconds,
-          'activityName': dataSource.activityName
+          'activityName': dataSource.activityName,
         };
         break;
       case DataSourceType.network:
@@ -84,9 +88,16 @@ class MethodChannelVideoPlayer extends VideoPlayerPlatform {
           'maxCacheFileSize': dataSource.maxCacheFileSize,
           'cacheKey': dataSource.cacheKey,
           'showNotification': dataSource.showNotification,
+          'id': dataSource.id,
+          'album': dataSource.album,
           'title': dataSource.title,
-          'author': dataSource.author,
+          'artist': dataSource.artist,
+          'genre': dataSource.genre,
+          'duration': dataSource.duration,
           'imageUrl': dataSource.imageUrl,
+          'displayTitle': dataSource.displayTitle,
+          'displaySubtitle': dataSource.displaySubtitle,
+          'displayDescription': dataSource.displayDescription,
           'notificationChannelName': dataSource.notificationChannelName,
           'overriddenDuration': dataSource.overriddenDuration?.inMilliseconds,
           'licenseUrl': dataSource.licenseUrl,
@@ -105,13 +116,20 @@ class MethodChannelVideoPlayer extends VideoPlayerPlatform {
           'maxCacheSize': 0,
           'maxCacheFileSize': 0,
           'showNotification': dataSource.showNotification,
+          'id': dataSource.id,
+          'album': dataSource.album,
           'title': dataSource.title,
-          'author': dataSource.author,
+          'artist': dataSource.artist,
+          'genre': dataSource.genre,
+          'duration': dataSource.duration,
           'imageUrl': dataSource.imageUrl,
+          'displayTitle': dataSource.displayTitle,
+          'displaySubtitle': dataSource.displaySubtitle,
+          'displayDescription': dataSource.displayDescription,
           'notificationChannelName': dataSource.notificationChannelName,
           'overriddenDuration': dataSource.overriddenDuration?.inMilliseconds,
           'activityName': dataSource.activityName,
-          'clearKey': dataSource.clearKey
+          'clearKey': dataSource.clearKey,
         };
         break;
     }
@@ -175,8 +193,7 @@ class MethodChannelVideoPlayer extends VideoPlayerPlatform {
   }
 
   @override
-  Future<void> setTrackParameters(
-      int? textureId, int? width, int? height, int? bitrate) {
+  Future<void> setTrackParameters(int? textureId, int? width, int? height, int? bitrate) {
     return _channel.invokeMethod<void>(
       'setTrackParameters',
       <String, dynamic>{
@@ -223,8 +240,7 @@ class MethodChannelVideoPlayer extends VideoPlayerPlatform {
   }
 
   @override
-  Future<void> enablePictureInPicture(int? textureId, double? top, double? left,
-      double? width, double? height) async {
+  Future<void> enablePictureInPicture(int? textureId, double? top, double? left, double? width, double? height) async {
     return _channel.invokeMethod<void>(
       'enablePictureInPicture',
       <String, dynamic>{
@@ -253,6 +269,19 @@ class MethodChannelVideoPlayer extends VideoPlayerPlatform {
       'disablePictureInPicture',
       <String, dynamic>{
         'textureId': textureId,
+      },
+    );
+  }
+
+  @override
+  Future<void> setCallActivityEnterPictureInPictureModeOnUserLeaveHint(int? textureId, bool shouldCall, int width, int height) async {
+    return _channel.invokeMethod<void>(
+      'setCallActivityEnterPictureInPictureModeOnUserLeaveHint',
+      <String, dynamic>{
+        'textureId': textureId,
+        'shouldCall': shouldCall,
+        'width': width,
+        'height': height,
       },
     );
   }
@@ -319,9 +348,7 @@ class MethodChannelVideoPlayer extends VideoPlayerPlatform {
 
   @override
   Stream<VideoEvent> videoEventsFor(int? textureId) {
-    return _eventChannelFor(textureId)
-        .receiveBroadcastStream()
-        .map((dynamic event) {
+    return _eventChannelFor(textureId).receiveBroadcastStream().map((dynamic event) {
       late Map<dynamic, dynamic> map;
       if (event is Map) {
         map = event;

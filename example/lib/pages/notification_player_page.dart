@@ -12,8 +12,7 @@ class _NotificationPlayerPageState extends State<NotificationPlayerPage> {
 
   @override
   void initState() {
-    BetterPlayerConfiguration betterPlayerConfiguration =
-        BetterPlayerConfiguration(
+    BetterPlayerConfiguration betterPlayerConfiguration = BetterPlayerConfiguration(
       aspectRatio: 16 / 9,
       fit: BoxFit.contain,
       handleLifecycle: true,
@@ -31,7 +30,7 @@ class _NotificationPlayerPageState extends State<NotificationPlayerPage> {
       notificationConfiguration: BetterPlayerNotificationConfiguration(
         showNotification: true,
         title: "Elephant dream",
-        author: "Some author",
+        artist: "Some author",
         imageUrl: Constants.catImageUrl,
       ),
     );
