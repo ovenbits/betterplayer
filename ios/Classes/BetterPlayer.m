@@ -225,8 +225,10 @@ static inline CGFloat radiansToDegrees(CGFloat radians) {
         item = [AVPlayerItem playerItemWithAsset:asset];
     }
 
-    if (@available(iOS 10.0, *) && overriddenDuration > 0) {
-        _overriddenDuration = overriddenDuration;
+    if (@available(iOS 10.0, *)) {
+        if (overriddenDuration > 0) {
+            _overriddenDuration = overriddenDuration;
+        }
     }
     return [self setDataSourcePlayerItem:item withKey:key];
 }
@@ -379,7 +381,7 @@ static inline CGFloat radiansToDegrees(CGFloat radians) {
         switch (item.status) {
             case AVPlayerItemStatusFailed:
                 NSLog(@"Failed to load video:");
-                NSLog(item.error.debugDescription);
+                NSLog(@"%@", item.error.debugDescription);
 
                 if (_eventSink != nil) {
                     _eventSink([FlutterError
@@ -481,6 +483,9 @@ static inline CGFloat radiansToDegrees(CGFloat radians) {
             @"height" : @(fabs(realSize.height) ? : height),
             @"key" : _key
         });
+        
+        [self usePlayerLayer:CGRectMake(0, 0, fabs(realSize.width) ? : width, fabs(realSize.height) ? : height)];
+        __playerLayer.opacity = 0.0f;
     }
 }
 
@@ -530,9 +535,11 @@ static inline CGFloat radiansToDegrees(CGFloat radians) {
          toleranceAfter:kCMTimeZero
       completionHandler:^(BOOL finished){
         if (wasPlaying){
-            _player.rate = _playerRate;
+            self.player.rate = self.playerRate;
         }
     }];
+    
+    [self updateNowPlaying];
 }
 
 - (void)setIsLooping:(bool)isLooping {
@@ -573,7 +580,7 @@ static inline CGFloat radiansToDegrees(CGFloat radians) {
 }
 
 
-- (void)setTrackParameters:(int) width: (int) height: (int)bitrate {
+- (void)setTrackParameters:(int)width : (int)height : (int)bitrate {
     _player.currentItem.preferredPeakBitRate = bitrate;
     if (@available(iOS 11.0, *)) {
         if (width == 0 && height == 0){
@@ -616,6 +623,9 @@ static inline CGFloat radiansToDegrees(CGFloat radians) {
         [[UIApplication sharedApplication] beginReceivingRemoteControlEvents];
         if (!_pipController && self._playerLayer && [AVPictureInPictureController isPictureInPictureSupported]) {
             _pipController = [[AVPictureInPictureController alloc] initWithPlayerLayer:self._playerLayer];
+            if (@available(iOS 14.2, *)) {
+                _pipController.canStartPictureInPictureAutomaticallyFromInline = YES;
+            }
             _pipController.delegate = self;
         }
     } else {
@@ -624,8 +634,9 @@ static inline CGFloat radiansToDegrees(CGFloat radians) {
 }
 
 - (void) enablePictureInPicture: (CGRect) frame{
-    [self disablePictureInPicture];
-    [self usePlayerLayer:frame];
+    self._playerLayer.frame = frame;
+    self._playerLayer.opacity = 1.0f;
+    [self setPictureInPicture:YES];
 }
 
 - (void)usePlayerLayer: (CGRect) frame
@@ -636,6 +647,7 @@ static inline CGFloat radiansToDegrees(CGFloat radians) {
         self._playerLayer = [AVPlayerLayer playerLayerWithPlayer:_player];
         UIViewController* vc = [[[UIApplication sharedApplication] keyWindow] rootViewController];
         self._playerLayer.frame = frame;
+        self._playerLayer.opacity = 1.0f;
         self._playerLayer.needsDisplayOnBoundsChange = YES;
         //  [self._playerLayer addObserver:self forKeyPath:readyForDisplayKeyPath options:NSKeyValueObservingOptionNew context:nil];
         [vc.view.layer addSublayer:self._playerLayer];
@@ -644,19 +656,18 @@ static inline CGFloat radiansToDegrees(CGFloat radians) {
             _pipController = NULL;
         }
         [self setupPipController];
-        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.2 * NSEC_PER_SEC)),
-                       dispatch_get_main_queue(), ^{
-            [self setPictureInPicture:true];
-        });
+//        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.2 * NSEC_PER_SEC)),
+//                       dispatch_get_main_queue(), ^{
+//            [self setPictureInPicture:true];
+//        });
     }
 }
 
 - (void)disablePictureInPicture
 {
-    [self setPictureInPicture:true];
+    [self setPictureInPicture:NO];
     if (__playerLayer){
-        [self._playerLayer removeFromSuperlayer];
-        self._playerLayer = nil;
+        self._playerLayer.opacity = 0.0f;
         if (_eventSink != nil) {
             _eventSink(@{@"event" : @"pipStop"});
         }
@@ -748,7 +759,7 @@ static inline CGFloat radiansToDegrees(CGFloat radians) {
         [self clear];
     }
     @catch(NSException *exception) {
-        NSLog(exception.debugDescription);
+        NSLog(@"%@", exception.debugDescription);
     }
 }
 
@@ -758,7 +769,150 @@ static inline CGFloat radiansToDegrees(CGFloat radians) {
     [_eventChannel setStreamHandler:nil];
     [self disablePictureInPicture];
     [self setPictureInPicture:false];
+    [self._playerLayer removeFromSuperlayer];
+    self._playerLayer = nil;
     _disposed = true;
+}
+
+- (void)disableNowPlaying {
+  [MPNowPlayingInfoCenter defaultCenter].nowPlayingInfo = nil;
+
+  MPRemoteCommandCenter *commandCenter = [MPRemoteCommandCenter sharedCommandCenter];
+
+  [commandCenter.togglePlayPauseCommand setEnabled:NO];
+  [commandCenter.togglePlayPauseCommand removeTarget:self];
+
+  [commandCenter.stopCommand removeTarget:self];
+  [commandCenter.pauseCommand removeTarget:self];
+  [commandCenter.playCommand removeTarget:self];
+
+  if (@available(iOS 9.1, *)) {
+    [commandCenter.changePlaybackPositionCommand removeTarget:self];
+  }
+
+  [commandCenter.skipForwardCommand removeTarget:self];
+  [commandCenter.skipBackwardCommand removeTarget:self];
+  [commandCenter.stopCommand removeTarget:self];
+}
+
+- (void)updateNowPlayingInfoCenter:(NSDictionary*)info {
+  _nowPlayingInfo = info;
+  [self updateNowPlaying];
+}
+
+- (void)updateNowPlaying {
+  if (_nowPlayingInfo == NULL) {
+    [self disableNowPlaying];
+    return;
+  }
+
+  NSMutableDictionary *nowPlayingInfo = [NSMutableDictionary new];
+  nowPlayingInfo[MPMediaItemPropertyTitle] = _nowPlayingInfo[@"title"];
+  nowPlayingInfo[MPMediaItemPropertyArtist] = _nowPlayingInfo[@"artist"];
+  nowPlayingInfo[MPMediaItemPropertyAlbumTitle] = _nowPlayingInfo[@"album"];
+  nowPlayingInfo[MPMediaItemPropertyGenre] = _nowPlayingInfo[@"genre"];
+
+  NSString* artUri = _nowPlayingInfo[@"imageUrl"];
+  if (artUri != NULL) {
+    NSData* data = [NSData dataWithContentsOfURL:[NSURL URLWithString:artUri]];
+    UIImage* artwork = [UIImage imageWithData:data];
+    if (artwork != NULL) {
+      nowPlayingInfo[MPMediaItemPropertyArtwork] = [[MPMediaItemArtwork alloc] initWithImage:artwork];
+    }
+  }
+
+  nowPlayingInfo[MPNowPlayingInfoPropertyElapsedPlaybackTime] = [NSNumber numberWithFloat:CMTimeGetSeconds(_player.currentItem.currentTime)];
+  nowPlayingInfo[MPMediaItemPropertyPlaybackDuration] = [NSNumber numberWithFloat:CMTimeGetSeconds(_player.currentItem.duration)];
+  nowPlayingInfo[MPNowPlayingInfoPropertyPlaybackRate] = [NSNumber numberWithFloat:_player.rate];
+
+  [[MPNowPlayingInfoCenter defaultCenter] setNowPlayingInfo:nowPlayingInfo];
+
+  MPRemoteCommandCenter *commandCenter = [MPRemoteCommandCenter sharedCommandCenter];
+
+  [commandCenter.togglePlayPauseCommand setEnabled:NO];
+  [commandCenter.togglePlayPauseCommand removeTarget:self];
+  [commandCenter.togglePlayPauseCommand setEnabled:YES];
+  [commandCenter.togglePlayPauseCommand addTarget:self action:@selector(togglePlayPause:)];
+
+  [commandCenter.stopCommand removeTarget:self];
+  [commandCenter.stopCommand addTarget:self action:@selector(stop:)];
+
+  [commandCenter.pauseCommand removeTarget:self];
+  [commandCenter.pauseCommand addTarget:self action:@selector(pause:)];
+
+  [commandCenter.playCommand removeTarget:self];
+  [commandCenter.playCommand addTarget:self action:@selector(play:)];
+
+  if (@available(iOS 9.1, *)) {
+    [commandCenter.changePlaybackPositionCommand removeTarget:self];
+    [commandCenter.changePlaybackPositionCommand addTarget:self action:@selector(changePlaybackPosition:)];
+  }
+
+  [commandCenter.skipForwardCommand removeTarget:self];
+  [commandCenter.skipForwardCommand addTarget:self action:@selector(skipForwardCommand:)];
+  NSNumber *fastForwardIntervalInSec = [NSNumber numberWithInt:10];
+  commandCenter.skipForwardCommand.preferredIntervals = @[fastForwardIntervalInSec];
+
+  [commandCenter.skipBackwardCommand removeTarget:self];
+  [commandCenter.skipBackwardCommand addTarget:self action:@selector(skipBackwardCommand:)];
+  NSNumber *rewindIntervalInSec = [NSNumber numberWithInt:10];
+  commandCenter.skipBackwardCommand.preferredIntervals = @[rewindIntervalInSec];
+
+  [commandCenter.stopCommand removeTarget:self];
+  [commandCenter.stopCommand addTarget:self action:@selector(stop:)];
+}
+
+- (MPRemoteCommandHandlerStatus)togglePlayPause:(MPRemoteCommandEvent*)event {
+  if (_isPlaying) {
+    [self pause];
+  } else {
+    [self play];
+  }
+  return MPRemoteCommandHandlerStatusSuccess;
+}
+
+- (MPRemoteCommandHandlerStatus)stop:(MPRemoteCommandEvent*)event {
+  [self pause];
+  return MPRemoteCommandHandlerStatusSuccess;
+}
+
+- (MPRemoteCommandHandlerStatus)pause:(MPRemoteCommandEvent*)event {
+  [self pause];
+  return MPRemoteCommandHandlerStatusSuccess;
+}
+
+- (MPRemoteCommandHandlerStatus)play:(MPRemoteCommandEvent*)event {
+  [self play];
+  return MPRemoteCommandHandlerStatusSuccess;
+}
+
+- (MPRemoteCommandHandlerStatus)changePlaybackPosition:(MPChangePlaybackPositionCommandEvent*)event {
+  [self seekTo:[NSNumber numberWithDouble:event.positionTime * 1000].intValue];
+  return MPRemoteCommandHandlerStatusSuccess;
+}
+
+- (MPRemoteCommandHandlerStatus)skipForwardCommand:(MPSeekCommandEvent*)event {
+  CMTime currentTime = _player.currentTime;
+  CMTime interval = CMTimeMake(((MPSkipIntervalCommandEvent*)event).interval * 1000, 1000);
+  CMTime skipTime = CMTimeAdd(currentTime, interval);
+
+  [_player seekToTime:skipTime
+      toleranceBefore:kCMTimeZero
+       toleranceAfter:kCMTimeZero];
+
+  return MPRemoteCommandHandlerStatusSuccess;
+}
+
+- (MPRemoteCommandHandlerStatus)skipBackwardCommand:(MPSeekCommandEvent*)event {
+  CMTime currentTime = _player.currentTime;
+  CMTime interval = CMTimeMake(((MPSkipIntervalCommandEvent*)event).interval * 1000, 1000);
+  CMTime skipTime = CMTimeSubtract(currentTime, interval);
+
+  [_player seekToTime:skipTime
+      toleranceBefore:kCMTimeZero
+       toleranceAfter:kCMTimeZero];
+
+  return MPRemoteCommandHandlerStatusSuccess;
 }
 
 @end
