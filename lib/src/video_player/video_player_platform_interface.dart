@@ -470,6 +470,9 @@ enum VideoEventType {
   /// The video is set to pause
   pause,
 
+  /// The video is set to stop
+  stop,
+
   /// The video is set to given to position
   seek,
 

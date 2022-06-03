@@ -33,6 +33,7 @@ class VideoPlayerValue {
     this.speed = 1.0,
     this.errorDescription,
     this.isPip = false,
+    this.isStopped = false,
   });
 
   /// Returns an instance with a `null` [Duration].
@@ -86,6 +87,9 @@ class VideoPlayerValue {
   ///Is in Picture in Picture Mode
   final bool isPip;
 
+  ///Is stopped
+  final bool isStopped;
+
   /// Indicates whether or not the video has been loaded and is ready to play.
   bool get initialized => duration != null;
 
@@ -121,6 +125,7 @@ class VideoPlayerValue {
     String? errorDescription,
     double? speed,
     bool? isPip,
+    bool? isStopped,
   }) {
     return VideoPlayerValue(
       duration: duration ?? this.duration,
@@ -135,6 +140,7 @@ class VideoPlayerValue {
       speed: speed ?? this.speed,
       errorDescription: errorDescription ?? this.errorDescription,
       isPip: isPip ?? this.isPip,
+      isStopped: isStopped ?? this.isStopped,
     );
   }
 
@@ -151,7 +157,9 @@ class VideoPlayerValue {
         'isLooping: $isLooping, '
         'isBuffering: $isBuffering, '
         'volume: $volume, '
-        'errorDescription: $errorDescription)';
+        'errorDescription: $errorDescription)'
+        'isPip: $isPip,'
+        'isStopped: $isStopped';
   }
 }
 
@@ -240,6 +248,11 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
           break;
         case VideoEventType.pause:
           pause();
+          break;
+        case VideoEventType.stop:
+          pause();
+          seekTo(Duration.zero);
+          value = value.copyWith(isStopped: true);
           break;
         case VideoEventType.seek:
           seekTo(event.position);
@@ -455,6 +468,7 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
     await _creatingCompleter.future;
     if (!_isDisposed) {
       _isDisposed = true;
+      value = value.copyWith(isStopped: true);
       value = VideoPlayerValue.uninitialized();
       _timer?.cancel();
       await _eventSubscription?.cancel();
@@ -718,7 +732,9 @@ class _VideoPlayerState extends State<VideoPlayer> {
   @override
   void didUpdateWidget(VideoPlayer oldWidget) {
     super.didUpdateWidget(oldWidget);
-    oldWidget.controller!.removeListener(_listener);
+    try {
+      oldWidget.controller!.removeListener(_listener);
+    } catch (_) {}
     _textureId = widget.controller!.textureId;
     widget.controller!.addListener(_listener);
   }
@@ -726,7 +742,9 @@ class _VideoPlayerState extends State<VideoPlayer> {
   @override
   void deactivate() {
     super.deactivate();
-    widget.controller!.removeListener(_listener);
+    try {
+      widget.controller!.removeListener(_listener);
+    } catch (_) {}
   }
 
   @override
