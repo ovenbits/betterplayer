@@ -12,6 +12,7 @@ import android.os.Handler
 import android.os.Looper
 import android.util.Log
 import android.util.LongSparseArray
+import android.util.Rational
 import com.jhomlala.better_player.BetterPlayerCache.releaseCache
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.embedding.engine.plugins.activity.ActivityAware
@@ -42,6 +43,7 @@ class BetterPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler, Plug
     private var pipHandler: Handler? = null
     private var pipRunnable: Runnable? = null
     private var callActivityEnterPictureInPictureModeOnUserLeaveHintForPlayer: BetterPlayer? = null
+    private var pictureInPictureAspectRatio: Rational? = null
     override fun onAttachedToEngine(binding: FlutterPluginBinding) {
         val loader = FlutterLoader()
         flutterState = FlutterState(
@@ -146,6 +148,11 @@ class BetterPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler, Plug
             SET_CALL_ACTIVITY_ENTER_PICTURE_IN_PICTURE_MODE_ON_USER_LEAVE_HINT_METHOD -> {
                 val textureId = (call.argument<Any>(TEXTURE_ID_PARAMETER) as Number?)!!.toLong()
                 val player = videoPlayers[textureId]
+
+                val width = (call.argument<Any>(WIDTH_PARAMETER) as Number?)!!.toInt()
+                val height = (call.argument<Any>(HEIGHT_PARAMETER) as Number?)!!.toInt()
+                setPictureInPictureAspectRatio(width, height)
+
                 setCallActivityEnterPictureInPictureModeOnUserLeaveHint(player, call.argument<Boolean>(SHOULD_CALL_PARAMETER) ?: false);
                 result.success(null);
             }
@@ -215,6 +222,9 @@ class BetterPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler, Plug
                 result.success(null)
             }
             ENABLE_PICTURE_IN_PICTURE_METHOD -> {
+                val width = (call.argument<Any>(WIDTH_PARAMETER) as Number?)!!.toInt()
+                val height = (call.argument<Any>(HEIGHT_PARAMETER) as Number?)!!.toInt()
+                setPictureInPictureAspectRatio(width, height)
                 enablePictureInPicture(player)
                 result.success(null)
             }
@@ -247,6 +257,22 @@ class BetterPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler, Plug
             }
             else -> result.notImplemented()
         }
+    }
+
+    private fun setPictureInPictureAspectRatio(width: Int, height: Int) {
+        var width = width
+        var height = height
+        val ratio = width.toDouble() / height.toDouble()
+
+        if (ratio > 2.39) {
+            width = 239
+            height = 100
+        } else if (ratio < 1 / 2.39) {
+            width = 100
+            height = 239
+        }
+
+        pictureInPictureAspectRatio = Rational(width, height)
     }
 
     private fun setDataSource(
@@ -441,9 +467,15 @@ class BetterPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler, Plug
 
     private fun enablePictureInPicture(player: BetterPlayer) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            player.setupMediaSession(flutterState!!.applicationContext)
             if (!activity!!.isInPictureInPictureMode) {
-                activity!!.enterPictureInPictureMode(PictureInPictureParams.Builder().build())
+                player.setupMediaSession(flutterState!!.applicationContext)
+                val builder = PictureInPictureParams.Builder()
+
+                if (pictureInPictureAspectRatio != null) {
+                    builder.setAspectRatio(pictureInPictureAspectRatio)
+                }
+
+                activity!!.enterPictureInPictureMode(builder.build())
                 startPictureInPictureListenerTimer(player)
             }
 

@@ -401,6 +401,15 @@ bool _remoteCommandsInitialized = false;
             double top = [argsMap[@"top"] doubleValue];
             double width = [argsMap[@"width"] doubleValue];
             double height = [argsMap[@"height"] doubleValue];
+
+            if (left != left) {
+                left = 0; // left was NaN
+            }
+
+            if (top != top) {
+                top = 0; // top was NaN
+            }
+
             [player enablePictureInPicture:CGRectMake(left, top, width, height)];
         } else if ([@"isPictureInPictureSupported" isEqualToString:call.method]){
             if (@available(iOS 9.0, *)){

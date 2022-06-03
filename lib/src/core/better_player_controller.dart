@@ -1008,8 +1008,8 @@ class BetterPlayerController {
         }
         final Offset position = renderBox.localToGlobal(Offset.zero);
         return videoPlayerController?.enablePictureInPicture(
-          left: position.dx,
-          top: position.dy,
+          left: position.dx.isNaN ? (betterPlayerGlobalKey.currentContext == null ? 0 : (MediaQuery.of(betterPlayerGlobalKey.currentContext!).size.width - renderBox.size.width) / 2) : position.dx,
+          top: position.dy.isNaN ? -renderBox.size.height : position.dy,
           width: renderBox.size.width,
           height: renderBox.size.height,
         );
