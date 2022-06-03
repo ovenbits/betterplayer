@@ -51,13 +51,13 @@ class BetterPlayerConfiguration {
   final double? fullScreenAspectRatio;
 
   /// Defines the set of allowed device orientations on entering fullscreen
-  final List<DeviceOrientation> deviceOrientationsOnFullScreen;
+  final List<DeviceOrientation>? deviceOrientationsOnFullScreen;
 
   /// Defines the system overlays visible after exiting fullscreen
   final List<SystemUiOverlay> systemOverlaysAfterFullScreen;
 
   /// Defines the set of allowed device orientations after exiting fullscreen
-  final List<DeviceOrientation> deviceOrientationsAfterFullScreen;
+  final List<DeviceOrientation>? deviceOrientationsAfterFullScreen;
 
   /// Defines a custom RoutePageBuilder for the fullscreen
   final BetterPlayerRoutePageBuilder? routePageBuilder;

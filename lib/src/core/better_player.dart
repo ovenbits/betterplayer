@@ -100,7 +100,9 @@ class _BetterPlayerState extends State<BetterPlayer> with WidgetsBindingObserver
       Wakelock.disable();
       _navigatorState.maybePop();
       SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual, overlays: _betterPlayerConfiguration.systemOverlaysAfterFullScreen);
-      SystemChrome.setPreferredOrientations(_betterPlayerConfiguration.deviceOrientationsAfterFullScreen);
+      if (_betterPlayerConfiguration.deviceOrientationsAfterFullScreen != null) {
+        SystemChrome.setPreferredOrientations(_betterPlayerConfiguration.deviceOrientationsAfterFullScreen!);
+      }
     }
 
     WidgetsBinding.instance.removeObserver(this);
@@ -207,9 +209,9 @@ class _BetterPlayerState extends State<BetterPlayer> with WidgetsBindingObserver
         deviceOrientations = [DeviceOrientation.landscapeLeft, DeviceOrientation.landscapeRight];
       }
       await SystemChrome.setPreferredOrientations(deviceOrientations);
-    } else {
+    } else if (widget.controller.betterPlayerConfiguration.deviceOrientationsOnFullScreen != null) {
       await SystemChrome.setPreferredOrientations(
-        widget.controller.betterPlayerConfiguration.deviceOrientationsOnFullScreen,
+        widget.controller.betterPlayerConfiguration.deviceOrientationsOnFullScreen!,
       );
     }
 
@@ -226,7 +228,9 @@ class _BetterPlayerState extends State<BetterPlayer> with WidgetsBindingObserver
     Wakelock.disable();
 
     await SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual, overlays: _betterPlayerConfiguration.systemOverlaysAfterFullScreen);
-    await SystemChrome.setPreferredOrientations(_betterPlayerConfiguration.deviceOrientationsAfterFullScreen);
+    if (_betterPlayerConfiguration.deviceOrientationsAfterFullScreen != null) {
+      await SystemChrome.setPreferredOrientations(_betterPlayerConfiguration.deviceOrientationsAfterFullScreen!);
+    }
   }
 
   Widget _buildPlayer() {
