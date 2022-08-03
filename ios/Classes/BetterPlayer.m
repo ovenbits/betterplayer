@@ -619,14 +619,16 @@ static inline CGFloat radiansToDegrees(CGFloat radians) {
 
 - (void)setupPipController {
     if (@available(iOS 9.0, *)) {
-        [[AVAudioSession sharedInstance] setActive: YES error: nil];
-        [[UIApplication sharedApplication] beginReceivingRemoteControlEvents];
-        if (!_pipController && self._playerLayer && [AVPictureInPictureController isPictureInPictureSupported]) {
-            _pipController = [[AVPictureInPictureController alloc] initWithPlayerLayer:self._playerLayer];
-            if (@available(iOS 14.2, *)) {
-                _pipController.canStartPictureInPictureAutomaticallyFromInline = YES;
+        if (__pictureInPictureSupported) {
+            [[AVAudioSession sharedInstance] setActive: YES error: nil];
+            [[UIApplication sharedApplication] beginReceivingRemoteControlEvents];
+            if (!_pipController && self._playerLayer && [AVPictureInPictureController isPictureInPictureSupported]) {
+                _pipController = [[AVPictureInPictureController alloc] initWithPlayerLayer:self._playerLayer];
+                if (@available(iOS 14.2, *)) {
+                    _pipController.canStartPictureInPictureAutomaticallyFromInline = YES;
+                }
+                _pipController.delegate = self;
             }
-            _pipController.delegate = self;
         }
     } else {
         // Fallback on earlier versions
@@ -639,11 +641,14 @@ static inline CGFloat radiansToDegrees(CGFloat radians) {
             _pipController.canStartPictureInPictureAutomaticallyFromInline = YES;
         }
         _pipController.delegate = self;
+        __pictureInPictureSupported = true;
     } else {
         if (@available(iOS 14.2, *)) {
             _pipController.canStartPictureInPictureAutomaticallyFromInline = NO;
         }
         _pipController.delegate = nil;
+        _pipController = nil;
+        __pictureInPictureSupported = false;
     }
 }
 
