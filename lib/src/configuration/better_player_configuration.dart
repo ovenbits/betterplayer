@@ -118,6 +118,9 @@ class BetterPlayerConfiguration {
   ///Default value is false.
   final bool useRootNavigator;
 
+  ///Defines flag which enables/disables picture-in-picture support. Default value is true.
+  final bool supportPictureInPicture;
+
   const BetterPlayerConfiguration({
     this.aspectRatio,
     this.autoPlay = false,
@@ -156,6 +159,7 @@ class BetterPlayerConfiguration {
     this.autoDispose = true,
     this.expandToFill = true,
     this.useRootNavigator = false,
+    this.supportPictureInPicture = true,
   });
 
   BetterPlayerConfiguration copyWith({
@@ -188,6 +192,7 @@ class BetterPlayerConfiguration {
     bool? autoDispose,
     bool? expandToFill,
     bool? useRootNavigator,
+    bool? supportPictureInPicture,
   }) {
     return BetterPlayerConfiguration(
       aspectRatio: aspectRatio ?? this.aspectRatio,
@@ -228,6 +233,7 @@ class BetterPlayerConfiguration {
       autoDispose: autoDispose ?? this.autoDispose,
       expandToFill: expandToFill ?? this.expandToFill,
       useRootNavigator: useRootNavigator ?? this.useRootNavigator,
+      supportPictureInPicture: supportPictureInPicture ?? this.supportPictureInPicture,
     );
   }
 }

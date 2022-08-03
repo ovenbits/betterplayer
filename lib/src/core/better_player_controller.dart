@@ -946,7 +946,7 @@ class BetterPlayerController {
         _wasPlayingBeforePause ??= isPlaying();
         pause();
       }
-    } else if (_betterPlayerGlobalKey != null) {
+    } else if (_betterPlayerGlobalKey != null && betterPlayerConfiguration.supportPictureInPicture) {
       if (Platform.isAndroid) {
         if (appLifecycleState == AppLifecycleState.inactive) {
           enablePictureInPicture(_betterPlayerGlobalKey!);
@@ -987,12 +987,30 @@ class BetterPlayerController {
     return _overriddenFit ?? betterPlayerConfiguration.fit;
   }
 
+  ///Enable/disable picture-in-picture support.
+  Future<void> setPictureInPictureSupported(bool supported) async {
+    if (videoPlayerController == null) {
+      throw StateError("The data source has not been initialized");
+    }
+
+    ///iOS 14.2+ includes an auto-start mechanism
+    ///for PiP (canStartPictureInPictureAutomaticallyFromInline),
+    ///so we only need to disable that on iOS
+    if (Platform.isIOS) {
+      return videoPlayerController?.setPictureInPictureSupported(supported);
+    }
+  }
+
   ///Enable Picture in Picture (PiP) mode. [betterPlayerGlobalKey] is required
   ///to open PiP mode in iOS. When device is not supported, PiP mode won't be
   ///open.
   Future<void>? enablePictureInPicture(GlobalKey betterPlayerGlobalKey) async {
     if (videoPlayerController == null) {
       throw StateError("The data source has not been initialized");
+    }
+
+    if (betterPlayerConfiguration.supportPictureInPicture == false) {
+      return;
     }
 
     final bool isPipSupported = (await videoPlayerController!.isPictureInPictureSupported()) ?? false;
@@ -1024,9 +1042,12 @@ class BetterPlayerController {
   }
 
   ///Disable Picture in Picture mode if it's enabled.
-  Future<void>? disablePictureInPicture() {
+  Future<void>? disablePictureInPicture() async {
     if (videoPlayerController == null) {
       throw StateError("The data source has not been initialized");
+    }
+    if (betterPlayerConfiguration.supportPictureInPicture == false) {
+      return;
     }
     return videoPlayerController!.disablePictureInPicture();
   }

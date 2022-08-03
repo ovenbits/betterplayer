@@ -641,6 +641,10 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
     await _videoPlayerPlatform.setTrackParameters(_textureId, width, height, bitrate);
   }
 
+  Future<void> setPictureInPictureSupported(bool supported) async {
+    await _videoPlayerPlatform.setPictureInPictureSupported(textureId, supported);
+  }
+
   Future<void> enablePictureInPicture({double? top, double? left, double? width, double? height}) async {
     await _videoPlayerPlatform.enablePictureInPicture(textureId, top, left, width, height);
   }

@@ -473,6 +473,9 @@ bool _remoteCommandsInitialized = false;
                 }
             }
             result(nil);
+        } else if ([@"setPictureInPictureSupported" isEqualToString:call.method]){
+            [player setPictureInPictureSupported:[argsMap[@"supported"] boolValue]];
+            result(nil);
         } else {
             result(FlutterMethodNotImplemented);
         }

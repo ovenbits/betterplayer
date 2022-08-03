@@ -53,6 +53,7 @@ NS_ASSUME_NONNULL_BEGIN
 - (void)setSpeed:(double)speed result:(FlutterResult)result;
 - (void) setAudioTrack:(NSString*) name index:(int) index;
 - (void)setTrackParameters:(int)width : (int)height : (int)bitrate;
+- (void)setPictureInPictureSupported:(BOOL)isSupported;
 - (void) enablePictureInPicture: (CGRect) frame;
 - (void)setPictureInPicture:(BOOL)pictureInPicture;
 - (void)disablePictureInPicture;

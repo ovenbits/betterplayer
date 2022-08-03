@@ -633,6 +633,20 @@ static inline CGFloat radiansToDegrees(CGFloat radians) {
     }
 }
 
+- (void) setPictureInPictureSupported: (BOOL) isSupported {
+    if (isSupported) {
+        if (@available(iOS 14.2, *)) {
+            _pipController.canStartPictureInPictureAutomaticallyFromInline = YES;
+        }
+        _pipController.delegate = self;
+    } else {
+        if (@available(iOS 14.2, *)) {
+            _pipController.canStartPictureInPictureAutomaticallyFromInline = NO;
+        }
+        _pipController.delegate = nil;
+    }
+}
+
 - (void) enablePictureInPicture: (CGRect) frame{
     self._playerLayer.frame = frame;
     self._playerLayer.opacity = 1.0f;
