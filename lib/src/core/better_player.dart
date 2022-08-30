@@ -99,7 +99,7 @@ class _BetterPlayerState extends State<BetterPlayer> with WidgetsBindingObserver
     if (_isFullScreen) {
       Wakelock.disable();
       _navigatorState.maybePop();
-      SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual, overlays: _betterPlayerConfiguration.systemOverlaysAfterFullScreen);
+      SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge); // (SystemUiMode.manual, overlays: _betterPlayerConfiguration.systemOverlaysAfterFullScreen);
       if (_betterPlayerConfiguration.deviceOrientationsAfterFullScreen != null) {
         SystemChrome.setPreferredOrientations(_betterPlayerConfiguration.deviceOrientationsAfterFullScreen!);
       }
@@ -227,7 +227,7 @@ class _BetterPlayerState extends State<BetterPlayer> with WidgetsBindingObserver
     // so we do not need to check Wakelock.isEnabled.
     Wakelock.disable();
 
-    await SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual, overlays: _betterPlayerConfiguration.systemOverlaysAfterFullScreen);
+    await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge); // (SystemUiMode.manual, overlays: _betterPlayerConfiguration.systemOverlaysAfterFullScreen);
     if (_betterPlayerConfiguration.deviceOrientationsAfterFullScreen != null) {
       await SystemChrome.setPreferredOrientations(_betterPlayerConfiguration.deviceOrientationsAfterFullScreen!);
     }
