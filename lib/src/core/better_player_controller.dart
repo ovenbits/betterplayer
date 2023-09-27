@@ -1200,7 +1200,7 @@ class BetterPlayerController {
   ///Stop pre cache for given [betterPlayerDataSource]. If there was no pre
   ///cache started for given [betterPlayerDataSource] then it will be ignored.
   Future<void> stopPreCache(BetterPlayerDataSource betterPlayerDataSource) async {
-    return VideoPlayerController?.stopPreCache(betterPlayerDataSource.url, betterPlayerDataSource.cacheConfiguration?.key);
+    return VideoPlayerController.stopPreCache(betterPlayerDataSource.url, betterPlayerDataSource.cacheConfiguration?.key);
   }
 
   /// Sets the new [betterPlayerControlsConfiguration] instance in the
