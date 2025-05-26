@@ -11,6 +11,7 @@ static void* playbackLikelyToKeepUpContext = &playbackLikelyToKeepUpContext;
 static void* playbackBufferEmptyContext = &playbackBufferEmptyContext;
 static void* playbackBufferFullContext = &playbackBufferFullContext;
 static void* presentationSizeContext = &presentationSizeContext;
+static void* durationContext = &durationContext;
 
 
 #if TARGET_OS_IOS
@@ -18,6 +19,13 @@ void (^__strong _Nonnull _restoreUserInterfaceForPIPStopCompletionHandler)(BOOL)
 API_AVAILABLE(ios(9.0))
 AVPictureInPictureController *_pipController;
 #endif
+
+@interface BetterPlayer ()
+@property (nonatomic, strong, readwrite) AVPlayer* player;
+@property (nonatomic, assign, readwrite) BOOL _observersAdded;
+@property (nonatomic, assign) BOOL _pictureInPicture;
+@property (nonatomic, assign) BOOL isDurationLoaded;
+@end
 
 @implementation BetterPlayer
 - (instancetype)initWithFrame:(CGRect)frame {
@@ -33,6 +41,7 @@ AVPictureInPictureController *_pipController;
         _player.automaticallyWaitsToMinimizeStalling = false;
     }
     self._observersAdded = false;
+    self.isDurationLoaded = false;
     return self;
 }
 
@@ -48,6 +57,7 @@ AVPictureInPictureController *_pipController;
         [item addObserver:self forKeyPath:@"loadedTimeRanges" options:0 context:timeRangeContext];
         [item addObserver:self forKeyPath:@"status" options:0 context:statusContext];
         [item addObserver:self forKeyPath:@"presentationSize" options:0 context:presentationSizeContext];
+        [item addObserver:self forKeyPath:@"duration" options:NSKeyValueObservingOptionNew context:durationContext];
         [item addObserver:self
                forKeyPath:@"playbackLikelyToKeepUp"
                   options:0
@@ -74,10 +84,7 @@ AVPictureInPictureController *_pipController;
     _disposed = false;
     _failedCount = 0;
     _key = nil;
-    if (_player.currentItem == nil) {
-        return;
-    }
-
+    self.isDurationLoaded = false;
     if (_player.currentItem == nil) {
         return;
     }
@@ -92,6 +99,7 @@ AVPictureInPictureController *_pipController;
         [_player removeObserver:self forKeyPath:@"rate" context:nil];
         [[_player currentItem] removeObserver:self forKeyPath:@"status" context:statusContext];
         [[_player currentItem] removeObserver:self forKeyPath:@"presentationSize" context:presentationSizeContext];
+        [[_player currentItem] removeObserver:self forKeyPath:@"duration" context:durationContext];
         [[_player currentItem] removeObserver:self
                                    forKeyPath:@"loadedTimeRanges"
                                       context:timeRangeContext];
@@ -238,6 +246,7 @@ static inline CGFloat radiansToDegrees(CGFloat radians) {
     _stalledCount = 0;
     _isStalledCheckStarted = false;
     _playerRate = 1;
+    self.isDurationLoaded = false;
     [_player replaceCurrentItemWithPlayerItem:item];
 
     AVAsset* asset = [item asset];
@@ -320,6 +329,18 @@ static inline CGFloat radiansToDegrees(CGFloat radians) {
                       ofObject:(id)object
                         change:(NSDictionary*)change
                        context:(void*)context {
+    if (context == durationContext) {
+        if (_eventSink != nil && _key != nil) {
+            int64_t duration = [self duration];
+            if (duration > 0) {
+                self.isDurationLoaded = true;
+                _eventSink(@{@"event" : @"durationChanged", 
+                           @"duration": @(duration),
+                           @"key" : _key});
+            }
+        }
+        return;
+    }
 
     if ([path isEqualToString:@"rate"]) {
         if (@available(iOS 10.0, *)) {
@@ -449,7 +470,6 @@ static inline CGFloat radiansToDegrees(CGFloat radians) {
         CGFloat width = size.width;
         CGFloat height = size.height;
 
-
         AVAsset *asset = _player.currentItem.asset;
         bool onlyAudio =  [[asset tracksWithMediaType:AVMediaTypeVideo] count] == 0;
 
@@ -458,9 +478,13 @@ static inline CGFloat radiansToDegrees(CGFloat radians) {
             return;
         }
         const BOOL isLive = CMTIME_IS_INDEFINITE([_player currentItem].duration);
-        // The player may be initialized but still needs to determine the duration.
-        if (isLive == false && [self duration] == 0) {
-            return;
+        
+        // Check duration only for non-live content
+        if (!isLive) {
+            int64_t currentDuration = [self duration];
+            if (currentDuration == 0 || !self.isDurationLoaded) {
+                return;
+            }
         }
 
         //Fix from https://github.com/flutter/flutter/issues/66413
@@ -469,16 +493,17 @@ static inline CGFloat radiansToDegrees(CGFloat radians) {
         CGAffineTransform prefTrans = track.assetTrack.preferredTransform;
         CGSize realSize = CGSizeApplyAffineTransform(naturalSize, prefTrans);
 
-        int64_t duration = [BetterPlayerTimeUtils FLTCMTimeToMillis:(_player.currentItem.asset.duration)];
+        int64_t duration = [self duration];
         if (_overriddenDuration > 0 && duration > _overriddenDuration){
             _player.currentItem.forwardPlaybackEndTime = CMTimeMake(_overriddenDuration/1000, 1);
+            duration = _overriddenDuration;
         }
 
         _isInitialized = true;
         [self updatePlayingState];
         _eventSink(@{
             @"event" : @"initialized",
-            @"duration" : @([self duration]),
+            @"duration" : @(duration),
             @"width" : @(fabs(realSize.width) ? : width),
             @"height" : @(fabs(realSize.height) ? : height),
             @"key" : _key
@@ -510,17 +535,31 @@ static inline CGFloat radiansToDegrees(CGFloat radians) {
 }
 
 - (int64_t)duration {
+    if (!_player || !_player.currentItem || !_player.currentItem.asset) {
+        return 0;
+    }
+    
     CMTime time;
     if (@available(iOS 13, *)) {
-        time =  [[_player currentItem] duration];
+        time = [[_player currentItem] duration];
     } else {
-        time =  [[[_player currentItem] asset] duration];
+        time = [[[_player currentItem] asset] duration];
     }
+    
+    if (CMTIME_IS_INVALID(time) || CMTIME_IS_INDEFINITE(time)) {
+        return 0;
+    }
+    
     if (!CMTIME_IS_INVALID(_player.currentItem.forwardPlaybackEndTime)) {
         time = [[_player currentItem] forwardPlaybackEndTime];
     }
-
-    return [BetterPlayerTimeUtils FLTCMTimeToMillis:(time)];
+    
+    int64_t durationInMillis = [BetterPlayerTimeUtils FLTCMTimeToMillis:(time)];
+    if (durationInMillis > 0 && !self.isDurationLoaded) {
+        self.isDurationLoaded = true;
+    }
+    
+    return durationInMillis;
 }
 
 - (void)seekTo:(int)location {
