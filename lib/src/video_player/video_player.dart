@@ -242,7 +242,11 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
             value = value.copyWith(isBuffering: false);
           }
           break;
-
+        case VideoEventType.durationChanged:
+          if (event.duration != null) {
+            value = value.copyWith(duration: event.duration);
+          }
+          break;
         case VideoEventType.play:
           play();
           break;
@@ -668,7 +672,8 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
   }
 
   Future<void> setCallActivityEnterPictureInPictureModeOnUserLeaveHint(bool shouldCall) async {
-    return _videoPlayerPlatform.setCallActivityEnterPictureInPictureModeOnUserLeaveHint(_textureId, shouldCall, value.size?.width.toInt() ?? 0, value.size?.height.toInt() ?? 0);
+    return _videoPlayerPlatform.setCallActivityEnterPictureInPictureModeOnUserLeaveHint(
+        _textureId, shouldCall, value.size?.width.toInt() ?? 0, value.size?.height.toInt() ?? 0);
   }
 
   void refresh() {

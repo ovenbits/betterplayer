@@ -153,7 +153,8 @@ abstract class VideoPlayerPlatform {
     throw UnimplementedError('isPictureInPictureEnabled() has not been implemented.');
   }
 
-  Future<void> setCallActivityEnterPictureInPictureModeOnUserLeaveHint(int? textureId, bool shouldCall, int width, int height) {
+  Future<void> setCallActivityEnterPictureInPictureModeOnUserLeaveHint(
+      int? textureId, bool shouldCall, int width, int height) {
     throw UnimplementedError('setCallActivityEnterPictureInPictureModeOnUserLeaveHint() has not been implemented.');
   }
 
@@ -442,7 +443,14 @@ class VideoEvent {
 
   @override
   bool operator ==(Object other) {
-    return identical(this, other) || other is VideoEvent && runtimeType == other.runtimeType && key == other.key && eventType == other.eventType && duration == other.duration && size == other.size && listEquals(buffered, other.buffered);
+    return identical(this, other) ||
+        other is VideoEvent &&
+            runtimeType == other.runtimeType &&
+            key == other.key &&
+            eventType == other.eventType &&
+            duration == other.duration &&
+            size == other.size &&
+            listEquals(buffered, other.buffered);
   }
 
   @override
@@ -486,6 +494,9 @@ enum VideoEventType {
 
   /// Picture in picture mode has been dismissed
   pipStop,
+
+  /// The duration of the video has changed
+  durationChanged,
 
   /// An unknown event has been received.
   unknown,
@@ -540,7 +551,9 @@ class DurationRange {
   String toString() => '$runtimeType(start: $start, end: $end)';
 
   @override
-  bool operator ==(Object other) => identical(this, other) || other is DurationRange && runtimeType == other.runtimeType && start == other.start && end == other.end;
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is DurationRange && runtimeType == other.runtimeType && start == other.start && end == other.end;
 
   @override
   int get hashCode => start.hashCode ^ end.hashCode;
