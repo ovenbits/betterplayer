@@ -20,13 +20,6 @@ API_AVAILABLE(ios(9.0))
 AVPictureInPictureController *_pipController;
 #endif
 
-@interface BetterPlayer ()
-@property (nonatomic, strong, readwrite) AVPlayer* player;
-@property (nonatomic, assign, readwrite) BOOL _observersAdded;
-@property (nonatomic, assign) BOOL _pictureInPicture;
-@property (nonatomic, assign) BOOL isDurationLoaded;
-@end
-
 @implementation BetterPlayer
 - (instancetype)initWithFrame:(CGRect)frame {
     self = [super init];
